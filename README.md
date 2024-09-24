@@ -2,6 +2,11 @@
 
 This project is a full-stack application for detecting deepfakes in images, audio, and video files.
 
+# Screenshot
+
+![Screenshot](./client/public/ss.png)
+
+
 ## Installation
 
 1. Clone the repository:

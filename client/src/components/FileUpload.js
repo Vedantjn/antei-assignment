@@ -1,22 +1,124 @@
 import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-
-const AnimatedTitle = ({ text }) => (
-  <motion.h2
-    className="text-lg sm:text-xl md:text-2xl font-bold mb-6 text-center"
-    initial={{ opacity: 0, y: -20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.8, ease: "easeOut" }}
-  >
-    {text}
-  </motion.h2>
-);
+import AnimatedTitle from './AnimatedTile';
 
 const FileUpload = () => {
   const [file, setFile] = useState(null);
   const [result, setResult] = useState('');
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
+
+  const processImage = (file) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const MAX_WIDTH = 400;
+        const MAX_HEIGHT = 300;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+          resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+        }, 'image/jpeg', 0.6);
+      };
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  const processAudio = async (file) => {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuffer = await file.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+    const offlineContext = new OfflineAudioContext(
+      1,
+      audioBuffer.sampleRate * 10,
+      audioBuffer.sampleRate
+    );
+
+    const source = offlineContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(offlineContext.destination);
+    source.start(0);
+
+    const renderedBuffer = await offlineContext.startRendering();
+    const sampleData = renderedBuffer.getChannelData(0);
+
+    const wavBuffer = new ArrayBuffer(44 + sampleData.length * 2);
+    const view = new DataView(wavBuffer);
+
+    const writeString = (view, offset, string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + sampleData.length * 2, true);
+    writeString(view, 8, 'WAVE');
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, offlineContext.sampleRate, true);
+    view.setUint32(28, offlineContext.sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(view, 36, 'data');
+    view.setUint32(40, sampleData.length * 2, true);
+
+    const floatTo16BitPCM = (output, offset, input) => {
+      for (let i = 0; i < input.length; i++, offset += 2) {
+        const s = Math.max(-1, Math.min(1, input[i]));
+        output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+    };
+
+    floatTo16BitPCM(view, 44, sampleData);
+
+    return new File([wavBuffer], 'processed_audio.wav', { type: 'audio/wav' });
+  };
+
+  const processVideo = async (file) => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.onloadedmetadata = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 320;
+        canvas.height = 240;
+        const ctx = canvas.getContext('2d');
+        
+        video.currentTime = 1; // Capture frame at 1 second
+        
+        video.onseeked = () => {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob((blob) => {
+            resolve(new File([blob], 'video_frame.jpg', { type: 'image/jpeg' }));
+          }, 'image/jpeg', 0.7);
+        };
+      };
+      video.src = URL.createObjectURL(file);
+    });
+  };
 
   const handleFileChange = (event) => {
     setFile(event.target.files[0]);
@@ -28,10 +130,22 @@ const FileUpload = () => {
 
     setLoading(true);
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
+      let processedFile;
+      if (file.type.startsWith('image/')) {
+        processedFile = await processImage(file);
+      } else if (file.type.startsWith('audio/')) {
+        processedFile = await processAudio(file);
+      } else if (file.type.startsWith('video/')) {
+        processedFile = await processVideo(file);
+      } else {
+        throw new Error('Unsupported file type');
+      }
+
+      const formData = new FormData();
+      formData.append('file', processedFile);
+      formData.append('originalType', file.type);
+
       const response = await fetch('http://localhost:5000/upload', {
         method: 'POST',
         body: formData,
@@ -57,8 +171,7 @@ const FileUpload = () => {
             ref={fileInputRef}
             onChange={handleFileChange}
             accept="image/*,audio/*,video/*"
-
-            className="block w-full text-sm text-gray-300 bg-gray-700 border border-gray-600 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer file:cursor-pointer"
+            className="block w-full text-sm text-gray-300 bg-gray-700 border border-gray-600 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
           />
         </div>
         <motion.button
@@ -100,4 +213,5 @@ const FileUpload = () => {
     </div>
   );
 };
+
 export default FileUpload;

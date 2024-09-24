@@ -1,7 +1,6 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const { processImage, processAudio, processVideo } = require('../utils/mediaProcessing');
 
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
@@ -11,28 +10,24 @@ router.post('/', upload.single('file'), async (req, res) => {
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
-  const fileType = req.file.mimetype.split('/')[0];
-  let processedFile;
+  const originalType = req.body.originalType;
 
   try {
-    switch (fileType) {
-      case 'image':
-        processedFile = await processImage(req.file.path);
-        break;
-      case 'audio':
-        processedFile = await processAudio(req.file.path);
-        break;
-      case 'video':
-        processedFile = await processVideo(req.file.path);
-        break;
-      default:
-        return res.status(400).json({ error: 'Unsupported file type' });
-    }
-
-    // Simulate AI analysis (random result)
+    // Here we would typically pass the file to your AI model for analysis
+    // But we are using random result for now
     const isDeepfake = Math.random() < 0.5;
 
-    res.json({ isDeepfake, processedFile });
+    // We can use the originalType to determine how to process the file
+    
+    // if (originalType.startsWith('video/')) {
+    //   // Process as a video frame
+    // } else if (originalType.startsWith('audio/')) {
+    //   // Process as an audio sample
+    // } else {
+    //   // Process as an image
+    // }
+
+    res.json({ isDeepfake });
   } catch (error) {
     console.error('Error processing file:', error);
     res.status(500).json({ error: 'Error processing file' });

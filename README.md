@@ -2,11 +2,6 @@
 
 This project is a full-stack application for detecting deepfakes in images, audio, and video files.
 
-## Prerequisites
-
-- Node.js (v14 or later)
-- npm
-
 ## Installation
 
 1. Clone the repository:

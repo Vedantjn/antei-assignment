@@ -57,7 +57,8 @@ const FileUpload = () => {
             ref={fileInputRef}
             onChange={handleFileChange}
             accept="image/*,audio/*,video/*"
-            className="block w-full text-sm text-gray-300 bg-gray-700 border border-gray-600 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
+
+            className="block w-full text-sm text-gray-300 bg-gray-700 border border-gray-600 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer file:cursor-pointer"
           />
         </div>
         <motion.button
@@ -99,5 +100,4 @@ const FileUpload = () => {
     </div>
   );
 };
-
 export default FileUpload;
